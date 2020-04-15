@@ -1,9 +1,3 @@
-alias gls='glideusd start'
-
-alias gis='git status'
-
-alias cls='find . -name ".DS_Store" -depth -exec rm {} \;'
-
 mis(){
     case $1 in
         sar) sudo service apache2 restart
@@ -24,6 +18,8 @@ mis(){
            echo 'chs : chmod the storage'
            echo 'log : tail latest logfile'
            echo 'pcd : phpmd codesize'
+           echo 'puc : phpunit --debug --group=current'
+           echo 'puf : phpunit --debug --filter=filter'
             ;;
     esac
 }
@@ -37,13 +33,13 @@ __log(){
 __chs(){
     if [[ -n "$1" ]]; then
         echo 'Need Password';
-        `echo "$1" | sudo -S chmod -R 777 storage bootstrap/cache`
+        `echo "$1" | sudo -S chmod -R o+wx storage`
     elif [ -n "${MY_ROOT_PASSWORD}" ]; then
         echo 'Loaded Password'
-        `echo ${MY_ROOT_PASSWORD} | sudo -S chmod -R 777 storage bootstrap/cache`
+        `echo ${MY_ROOT_PASSWORD} | sudo -S chmod -R o+wx storage`
     else
         echo 'Enter Password'
-        `sudo chmod -R 777 storage bootstrap/cache`
+        `sudo chmod -R o+wx storage`
     fi
 }
 __sdb(){
@@ -58,6 +54,83 @@ __sdb(){
 __pcode(){
     phpmd $1 text codesize;
 }
+__multitail(){
+    # When this exits, exit all back ground process also.
+    trap 'kill $(jobs -p)' EXIT
+
+    # iterate through the each given file names,
+    for file in "$@"
+    do
+        # show tails of each in background.
+        tail -f $file &
+    done
+
+    # wait .. until CTRL+C
+    wait
+}
 __int(){
     /usr/bin/xmodmap /home/aj/.Xmodmap
+
+}
+__als(){
+    alias ls="ls -p"
+    alias ll="ls -lah"
+    alias gim='git checkout master && git pull origin master && git checkout -'
+    alias gidev='git checkout dev && git pull origin dev && git checkout -'
+    alias gica='git commit --amend'
+    alias gican='git commit --amend --no-edit'
+    alias gio='git push origin HEAD'
+    alias gfo='git fetch origin'
+    alias cls='find . -name ".DS_Store" -depth -exec rm {} \;'c
+    alias tailf="tail -f -b10"
+    alias garcl="git tag | grep '^archive/'"
+    alias par='php artisan'
+    alias mgm='go run /Users/aj/projects/go/src/my/.'
+}
+__als
+gfco(){
+    gfo $1 && gco $1
+}
+
+garc(){
+    git tag archive/$1 $1 && git branch -D $1;
+}
+garcall(){
+    git for-each-ref --format '%(refname:short)' refs/heads | grep -Ev 'master|canary|dark|p2po' |
+    while IFS= read -r line
+    do
+       garc "$line"
+    done
+}
+garcr(){
+    git checkout -b $1 archive/$1
+}
+__git_com(){
+    __git_complete garc _git_checkout
+    __git_complete gars _git_checkout
+}
+__git_com
+
+function ddep {
+#    STATUS=$(drone build info razorpay/api $1 | grep -i success |  wc -l)
+#    while [ $STATUS -lt 1 ]; do
+#        echo 'build not complete'
+#        sleep 30
+#        STATUS=$(drone build info razorpay/api $1 | grep -i success |  wc -l)
+#    done
+    osascript -e 'display notification "Build '"$1"' complete. Deploying now on '"$2"'" with title "Deployment started"'
+    if [ "$2" = "prod-api" ]
+    then
+        echo "access denied"
+    else
+        line=$(drone deploy razorpay/api $1 $2 | head -n 1)
+        NUMBER=${line##* }
+        STATUS=$(drone build info razorpay/api $NUMBER | grep -i success |  wc -l)
+        while [ $STATUS -lt 1 ]; do
+            echo 'deployment not complete'
+            sleep 30
+            STATUS=$(drone build info razorpay/api $NUMBER | grep -i success |  wc -l)
+        done
+        osascript -e 'display notification "build with number '"$NUMBER"' deployed on '"$2"'" with title "Build deployed"'
+    fi
 }
